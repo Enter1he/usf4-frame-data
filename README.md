@@ -1,4 +1,4 @@
-# frame-data
+# usf4-frame-data
 Fighting game character frame data in json and csv formats.
 
 # [Ultra Street Fighter 4]
@@ -33,13 +33,7 @@ ha|Hit Advantage
 ## JSON Schema
 ```
 {
-  normal-attack: {
-    standing: { startup: num, active: num, recovery: num, block-advantage: num, hit-advantage: num }
-    close standing: {...}
-    crouching: {...}
-    neutral jump: {...}
-    diagonal jump: {...}
-  }
-  unique-attack: {...}
+  normal-attack: { startup: num, active: num, recovery: num, block-advantage: num, hit-advantage: num }
+  unique-attack: { startup: num, active: num, recovery: num, block-advantage: num, hit-advantage: num }
 }
 ```
