@@ -99,7 +99,11 @@ class FrameDatum
 
   def sanitize_name!
     @movement_name.gsub!(/(\()|(\)|(,))/, '')
-    acronymize_name!.gsub!(/(\s)|(\-)/, "_")
+    acronymize_name!
+    if @movement_name =~ /((\s)+)|(\-)+/
+      @movement_name.gsub!(/(\s)|(\-)/, "_")
+    end
+    @movement_name
   end
 
   def acronymize_name!
@@ -145,6 +149,7 @@ end
 
 # start
 file = ARGV[0]
+dump_schema = ENV["DUMP_SCHEMA"] ? true : false
 
 unless file
   @logger.error("#{ARGV[0].inspect}: File is null")
@@ -155,7 +160,6 @@ unless File.exists?(File.path(file))
   @logger.error("#{file.inspect}: File not found")
   exit(1)
 end
-
 
 name = File.basename(file, '.csv')
 title = File.split(file).first.split('/').first
@@ -175,7 +179,12 @@ CSV.foreach(file, headers: {first_row: true}) do |row|
   @schema[schema_key] = json
 end
 
-@logger.info("Writing data to #{name}.json")
-json_path = File.join(Dir.pwd, title, 'json', "#{name}.json")
+if dump_schema
+  @logger.info("Dumping schema")
+  puts @schema
+else
+  @logger.info("Writing data to #{name}.json")
+  json_path = File.join(Dir.pwd, title, 'json', "#{name}.json")
+  File.open(json_path, "w+") { |f| f.write(@schema.to_json) }
+end
 
-File.open(json_path, "w+") { |f| f.write(@schema.to_json) }
