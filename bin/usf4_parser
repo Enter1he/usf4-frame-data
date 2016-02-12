@@ -3,7 +3,11 @@
 require 'logger'
 require 'csv'
 require 'json'
+require 'optparse'
 
+@schema = {}
+@logger = Logger.new(STDOUT)
+@logger.level = Logger::INFO
 @key = {
   'Close Light Punch'         => 'cl.lp',
   'Close LP'                  => 'cl.lp',
@@ -67,9 +71,12 @@ require 'json'
   'Jump Toward HK'            => "dj.hk"
 }
 
-@schema = {}
-@logger = Logger.new(STDOUT)
-@logger.level = Logger::INFO
+begin
+  require 'gist'
+rescue LoadError => load_error
+  @logger.error("Unable to require gist gem...skipping")
+  load_error.backtrace.each { |trace| @logger.error(trace) }
+end
 
 class FrameDatum
   attr_reader :startup, :active, :recovery, :block_advantage, :hit_advantage
@@ -149,7 +156,6 @@ end
 
 # start
 file = ARGV[0]
-dump_schema = ENV["DUMP_SCHEMA"] ? true : false
 
 unless file
   @logger.error("#{ARGV[0].inspect}: File is null")
@@ -164,27 +170,48 @@ end
 name = File.basename(file, '.csv')
 title = File.split(file).first.split('/').first
 
+options = {}
+OptionParser.new do |opts|
+  opts.banner = "Usage: ./usf4_parser [options] [filename]"
+  opts.on("-d", "--dump-schema", "Dump schema stdout") do
+    options[:dump_schema] = true
+  end
+end.parse!
+
 @logger.info("Generating data for #{name.inspect}")
 
 CSV.foreach(file, headers: {first_row: true}) do |row|
   movement_name = row[0]
-
   frame_datum = FrameDatum.new(row)
   k = key(movement_name)
-
   json = frame_datum.to_json
-
   schema_key = k ? k : frame_datum.sanitize_name!
-
   @schema[schema_key] = json
 end
 
-if dump_schema
-  @logger.info("Dumping schema")
-  puts @schema
-else
-  @logger.info("Writing data to #{name}.json")
-  json_path = File.join(Dir.pwd, title, 'json', "#{name}.json")
-  File.open(json_path, "w+") { |f| f.write(@schema.to_json) }
+move_list = @schema.keys
+filename = "#{name}-move-list.txt"
+
+begin
+  gist = Gist.gist(move_list.join("\n"), filename: filename)
+  url = gist['files'][filename]['raw_url']
+  @schema['move_list'] = url
+  @logger.info("Generated gist for #{filename}: #{url}")
+rescue Gist::Error => gist_error
+  @logger.error("Failed to generate gist for #{filename}")
+  gist_error.backtrace.each { |trace| @logger.error(trace) }
+  exit(1)
 end
 
+if options[:dump_schema]
+  @logger.info("Dumping schema")
+  if options[:move_list]
+    puts @schema.keys
+  else
+    puts @schema
+  end
+else
+  json_path = File.join(Dir.pwd, title, 'json', "#{name}.json")
+  @logger.info("Writing frame data to #{file}")
+  File.open(json_path, "w+") { |f| f.write(@schema.to_json) }
+end
